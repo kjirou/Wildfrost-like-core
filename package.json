@@ -2,9 +2,13 @@
   "name": "@kjirou/wildfrost-like-game-core",
   "version": "0.0.0",
   "description": "Core engine for Wildfrost-like games",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc",
+    "develop": "ts-node src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "tsc": "tsc --noEmit"
   },
   "keywords": [],
   "author": "kjirou",
