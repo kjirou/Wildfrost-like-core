@@ -4,20 +4,35 @@
 // 攻撃に対するリアクションで発動するもの、オリジナルのオカエシ
 // 攻撃に対して付随して発動するもの、オリジナルのメガハンマー？だっけ
 
+/**
+ * "none" は、行動に攻撃を伴わないことを意味する。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
+ */
+type AttackingTarget = "back" | "front" | "low" | "none" | "random";
+
 type FieldObjectAction = {
+  attackingTarget: AttackingTarget;
   repeats: number;
-  targetting: "back" | "front" | "low" | "random";
+  wait: number;
 };
 
-type StateChange = {
-  kind:
-    | "attackPointModification"
-    | "actionWaitFrozen"
-    | "damageDoubled"
-    | "gradualWeakeningDot"
-    | "oneTimeAttackPointModification";
-  points: number;
-};
+type StateChange = { duration: number | undefined } & (
+  | {
+      kind:
+        | "attackPointModification"
+        | "actionRepeatModification"
+        | "additionalDamage"
+        | "gradualWeakeningDot"
+        | "oneTimeAttackPointModification";
+      points: number;
+    }
+  | {
+      kind: "actionWaitFrozen" | "confusion" | "damageDoubled" | "sealed";
+    }
+  | {
+      attackingTarget: AttackingTarget;
+      kind: "targettingModification";
+    }
+);
 
 type PassiveSkill = {
   kind: "addionalStateChange" | "reactionToAttack";
@@ -32,8 +47,11 @@ type PassiveSkill = {
  * TODO: 1 オブジェクトが複数マスを占有することがある。オリジナルだと縦2マスのみ。
  */
 type FieldObject = {
-  action: FieldObjectAction;
-  actionWait: number;
+  /**
+   * undefined は、行動をしないことを意味する。オリジナルだと、いくつかのクランカーやスパイクなどが該当する。
+   */
+  action: FieldObjectAction | undefined;
+  armorPoints: number;
   attackPoints: number;
   elapsedActionWait: number;
   id: string;
