@@ -10,11 +10,6 @@ type Target =
   | "rowOfAllies"
   | "self";
 
-type FieldObjectAction = {
-  repeats: number;
-  wait: number;
-};
-
 type StateChange = { duration: number | undefined } & (
   | {
       kind:
@@ -51,7 +46,7 @@ type Effect =
   | { kind: "retreat" }
   | { kind: "stateChangeAddition"; points: number };
 
-type PassiveSkill =
+type FieldObjectSkill =
   | {
       effect: Effect;
       kind: "actionEffect";
@@ -75,6 +70,17 @@ type PassiveSkill =
       target: Target;
     };
 
+type FieldObjectAction = {
+  repeats: number;
+  wait: number;
+};
+
+/** オリジナルでは、プレイヤーによるカード使用が該当する。 */
+type InterruptAction = {
+  targetSelection: "ally" | "anyone" | "enemy" | "none";
+  // TODO: effect & target の概念がわからない　affect?
+};
+
 /**
  * フィールドのマスを占有するオブジェクト
  *
@@ -85,7 +91,7 @@ type PassiveSkill =
 type FieldObject = {
   /**
    * undefined は、行動をしないことを意味する。オリジナルだと、いくつかのクランカーやスパイクなどが該当する。
-   * 行動に攻撃を伴わないことの表現は、passiveSkills に "attack" の Effect を含まないことで行う。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
+   * 行動に攻撃を伴わないことの表現は、 skills に "attack" の Effect を含まないことで行う。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
    */
   action: FieldObjectAction | undefined;
   /** オリジナルのシェル */
@@ -94,10 +100,10 @@ type FieldObject = {
   id: string;
   lifePoints: number;
   maxLifePoints: number;
-  passiveSkills: Array<PassiveSkill>;
   shieldScrapingPoints: number;
   /** オリジナルのバリア */
   shieldPoints: number;
+  skills: Array<FieldObjectSkill>;
   stateChanges: Array<StateChange>;
 };
 
