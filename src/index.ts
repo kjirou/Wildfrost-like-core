@@ -9,7 +9,15 @@ type FieldObjectAction = {
   targetting: "back" | "front" | "low" | "random";
 };
 
-type StateChange = {};
+type StateChange = {
+  kind:
+    | "attackPointModification"
+    | "actionWaitFrozen"
+    | "damageDoubled"
+    | "gradualWeakeningDot"
+    | "oneTimeAttackPointModification";
+  points: number;
+};
 
 type PassiveSkill = {
   kind: "addionalStateChange" | "reactionToAttack";
@@ -30,14 +38,11 @@ type FieldObject = {
   elapsedActionWait: number;
   id: string;
   lifePoints: number;
-  maxAttackPoints: number;
   maxLifePoints: number;
-  maxShieldScrapingPoints: number;
   passiveSkills: Array<PassiveSkill>;
   shieldScrapingPoints: number;
   shieldPoints: number;
   stateChanges: Array<StateChange>;
-  stunPoints: number;
 };
 
 /**
