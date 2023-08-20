@@ -6,13 +6,11 @@ type Target =
   | "none"
   | "random"
   | "randomAlly"
-  | "row";
+  | "row"
+  | "rowOfAllies"
+  | "self";
 
 type FieldObjectAction = {
-  /**
-   * "none" は、行動に攻撃を伴わないことを意味する。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
-   */
-  attackingTarget: Target;
   repeats: number;
   wait: number;
 };
@@ -22,13 +20,13 @@ type StateChange = { duration: number | undefined } & (
       kind:
         | "attackPointModification"
         | "actionRepeatModification"
-        | "additionalDamage"
+        | "additionalDamageInflicted"
         | "gradualWeakeningDot"
         | "oneTimeAttackPointModification";
       points: number;
     }
   | {
-      kind: "actionWaitFrozen" | "damageDoubled" | "sealed";
+      kind: "actionWaitFrozen" | "doubleDamageInflicted" | "sealed";
     }
   | {
       attackingTarget: Target;
@@ -39,15 +37,42 @@ type StateChange = { duration: number | undefined } & (
     }
 );
 
+type Effect =
+  | { kind: "absorption" }
+  | {
+      // TODO: もしかすると、攻撃に伴う追加ダメージではなくてこの処理だけ独立なのかもしれない？ログでわかりそう。
+      // TODO: オリジナルだと、ブリンク/50 追加ダメージのオマモリもある。
+      additionalDamageKind: "armor" | "life" | "none";
+      kind: "attack";
+      points: number;
+    }
+  | { kind: "death" }
+  | { kind: "lifePointModification"; points: number }
+  | { kind: "retreat" }
+  | { kind: "stateChangeAddition"; points: number };
+
 type PassiveSkill =
   | {
+      effect: Effect;
+      kind: "actionEffect";
+      target: Target;
+    }
+  | {
+      content: "actionPerforming" | Effect;
       kind:
         | "reactionToAllyAttacks"
         | "reactionToAttackOnOneself"
-        | "reactionToEnemyAttacks";
+        | "reactionToDotInflictedOnAnyone"
+        | "reactionToEnemyAttacks"
+        | "reactionToStateChange"
+        | "reactionToStateChangeOnAlly";
+      target: Target | "attacker";
     }
   | {
-      kind: "addionalStateChange";
+      /** オリジナルの「場にある間〜」に該当する。 */
+      kind: "stateChange";
+      stateChange: StateChange;
+      target: Target;
     };
 
 /**
@@ -60,11 +85,11 @@ type PassiveSkill =
 type FieldObject = {
   /**
    * undefined は、行動をしないことを意味する。オリジナルだと、いくつかのクランカーやスパイクなどが該当する。
+   * 行動に攻撃を伴わないことの表現は、passiveSkills に "attack" の Effect を含まないことで行う。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
    */
   action: FieldObjectAction | undefined;
   /** オリジナルのシェル */
   armorPoints: number;
-  attackPoints: number;
   elapsedActionWait: number;
   id: string;
   lifePoints: number;
