@@ -1,16 +1,18 @@
-// 色々な行動(FieldObjectAction)のタイミング
-//
-// フィールドオブジェクトがtimer0で発動するもの
-// 攻撃に対するリアクションで発動するもの、オリジナルのオカエシ
-// 攻撃に対して付随して発動するもの、オリジナルのメガハンマー？だっけ
-
-/**
- * "none" は、行動に攻撃を伴わないことを意味する。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
- */
-type AttackingTarget = "back" | "front" | "low" | "none" | "random";
+type Target =
+  | "all"
+  | "allAllies"
+  | "back"
+  | "front"
+  | "none"
+  | "random"
+  | "randomAlly"
+  | "row";
 
 type FieldObjectAction = {
-  attackingTarget: AttackingTarget;
+  /**
+   * "none" は、行動に攻撃を伴わないことを意味する。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
+   */
+  attackingTarget: Target;
   repeats: number;
   wait: number;
 };
@@ -26,18 +28,27 @@ type StateChange = { duration: number | undefined } & (
       points: number;
     }
   | {
-      kind: "actionWaitFrozen" | "confusion" | "damageDoubled" | "sealed";
+      kind: "actionWaitFrozen" | "damageDoubled" | "sealed";
     }
   | {
-      attackingTarget: AttackingTarget;
-      kind: "targettingModification";
+      attackingTarget: Target;
+      /**
+       * オリジナルの混乱は、これの "randomAlly" が該当する。
+       */
+      kind: "attackingTargetModification";
     }
 );
 
-type PassiveSkill = {
-  kind: "addionalStateChange" | "reactionToAttack";
-  power: number;
-};
+type PassiveSkill =
+  | {
+      kind:
+        | "reactionToAllyAttacks"
+        | "reactionToAttackOnOneself"
+        | "reactionToEnemyAttacks";
+    }
+  | {
+      kind: "addionalStateChange";
+    };
 
 /**
  * フィールドのマスを占有するオブジェクト
@@ -51,6 +62,7 @@ type FieldObject = {
    * undefined は、行動をしないことを意味する。オリジナルだと、いくつかのクランカーやスパイクなどが該当する。
    */
   action: FieldObjectAction | undefined;
+  /** オリジナルのシェル */
   armorPoints: number;
   attackPoints: number;
   elapsedActionWait: number;
@@ -59,6 +71,7 @@ type FieldObject = {
   maxLifePoints: number;
   passiveSkills: Array<PassiveSkill>;
   shieldScrapingPoints: number;
+  /** オリジナルのバリア */
   shieldPoints: number;
   stateChanges: Array<StateChange>;
 };
