@@ -1,3 +1,8 @@
+// TODO: オリジナルの動作確認
+// - スノッフェルが攻撃力 0 の攻撃を持った条件の調査。オカエシ or ボム1 だった気がする。
+// - シェル・ライフ・ブリンク/50の「追加ダメージ」がログ上別処理になっているのかどうか。
+//   - 別処理なら、lifePointModification として扱った方が良さそう。
+
 type RelativeSide = "ally" | "enemy";
 
 /**
@@ -74,9 +79,12 @@ type Effect =
       // TODO: もしかすると、攻撃に伴う追加ダメージではなくてこの処理だけ独立なのかもしれない？ログでわかりそう。
       // TODO: オリジナルだと、ブリンク/50 追加ダメージのオマモリもある。
       additionalDamageKind: "armor" | "life" | "none";
-      points: number;
+      attackPoints: number;
+      /** シールド減少する点数。オリジナルにはなさそうな概念で、オリジナル相当だと常に1。 */
+      shieldScrapingPoints: number;
     }
   | { kind: "death" }
+  | { kind: "drawCards"; count: number }
   | { kind: "lifePointModification"; points: number }
   | { kind: "retreat" }
   | { kind: "stateChangeAddition"; points: number };
@@ -94,11 +102,20 @@ type FieldObjectSkill =
         | "reactionToAttackOnOneself"
         | "reactionToDotInflictedOnAnyone"
         | "reactionToEnemyAttacks"
+        | "reactionToEntry"
         | "reactionToStateChange"
         | "reactionToStateChangeOnAlly";
-      area: AreaOfEffect;
-      content: "actionPerforming" | Effect;
-      targetting: Targetting;
+      content:
+        | {
+            kind: "autoActionPerforming";
+            changeTargetting: "toInvoker" | undefined;
+          }
+        | {
+            kind: "impact";
+            area: AreaOfEffect;
+            effect: Effect;
+            targetting: Targetting;
+          };
     }
   | {
       /** オリジナルの「場にある間〜」に該当する。 */
@@ -130,19 +147,20 @@ type InterruptAction = {
  * TODO: 1 オブジェクトが複数マスを占有することがある。オリジナルだと縦2マスのみ。
  */
 type FieldObject = {
+  /** オリジナルのシェルに該当する。 */
+  armorPoints: number;
   /**
    * undefined は、行動をしないことを意味する。オリジナルだと、いくつかのクランカーやスパイクなどが該当する。
-   * 行動に攻撃を伴わないことの表現は、 skills に "attack" の Effect を含まないことで行う。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
+   *
+   * 行動に攻撃を伴わないことの表現は、 skills の "autoActionImpact" の effect に "attack" を含まないことで行う。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
+   * なおオリジナルでスノッフェルにオカエシとボム1のオマモリをつけたら、反撃は攻撃力 0 の対象 1 の攻撃を行うようになったが、どちらに起因していたのか不明。
    */
-  action: FieldObjectAutoAction | undefined;
-  /** オリジナルのシェル */
-  armorPoints: number;
-  elapsedActionWait: number;
+  autoAction: FieldObjectAutoAction | undefined;
+  elapsedAutoActionWait: number;
   id: string;
   lifePoints: number;
   maxLifePoints: number;
-  shieldScrapingPoints: number;
-  /** オリジナルのバリア */
+  /** オリジナルのブロックに該当する。 */
   shieldPoints: number;
   skills: Array<FieldObjectSkill>;
   stateChanges: Array<StateChange>;
