@@ -142,7 +142,7 @@ type InterruptAction = {
 /**
  * フィールドのマスを占有するオブジェクト
  *
- * オリジナルだとキャラクターまたはクランカーに相当する。
+ * オリジナルだと仲間・エネミー・ボス・ミニボス・クランカーに相当する。
  *
  * TODO: 1 オブジェクトが複数マスを占有することがある。オリジナルだと縦2マスのみ。
  */
@@ -157,13 +157,33 @@ type FieldObject = {
    */
   autoAction: FieldObjectAutoAction | undefined;
   elapsedAutoActionWait: number;
+  /**
+   * ゲーム中に生成されるものは、デバッグのため "{presetId}-{全フィールドオブジェクトで1始まりの連番}" へ統一する。
+   */
   id: string;
   lifePoints: number;
   maxLifePoints: number;
+  /** 必ずプリセットから生成する必要がある。 */
+  presetId: string;
   /** オリジナルのブロックに該当する。 */
   shieldPoints: number;
   skills: Array<FieldObjectSkill>;
   stateChanges: Array<StateChange>;
+};
+
+/**
+ * フィールドオブジェクトの雛形
+ *
+ * 種族のような概念を作って委譲する形式にすると種族変更みたいなことはできてやや面白くはなるけど、パラメータを都度合計しないといけないので開発中の見通しが悪くなる。
+ */
+type FieldObjectPreset = {
+  armorPoints: FieldObject["armorPoints"];
+  autoAction: FieldObject["autoAction"];
+  id: string;
+  maxLifePoints: FieldObject["maxLifePoints"];
+  shieldPoints: FieldObject["shieldPoints"];
+  skills: FieldObject["skills"];
+  stateChanges: FieldObject["stateChanges"];
 };
 
 /**
@@ -191,3 +211,97 @@ type Field = {
   leftSideTileGrid: TileGrid;
   rightSideTileGrid: TileGrid;
 };
+
+// TODO: プレイヤーと手札・山札・捨札。0-2 人対応にできると良さそう。
+type Game = {
+  field: Field;
+};
+
+const createTileGrid = (params: {
+  width: number;
+  height: number;
+}): TileGrid => {
+  const tileGrid: TileGrid = [];
+  for (let i = 0; i < params.height; i++) {
+    const row: Tile[] = [];
+    for (let j = 0; j < params.width; j++) {
+      row.push({ occupation: undefined });
+    }
+    tileGrid.push(row);
+  }
+  return tileGrid;
+};
+
+const createField = (params: {
+  tileGridHeight: number;
+  tileGridWidth: number;
+}): Field => {
+  return {
+    leftSideTileGrid: createTileGrid({
+      width: params.tileGridWidth,
+      height: params.tileGridHeight,
+    }),
+    rightSideTileGrid: createTileGrid({
+      width: params.tileGridWidth,
+      height: params.tileGridHeight,
+    }),
+    fieldObjects: [],
+    fieldEffects: [],
+  };
+};
+
+const fieldObjectPresets: FieldObjectPreset[] = [
+  {
+    id: "none",
+    maxLifePoints: 1,
+    armorPoints: 0,
+    shieldPoints: 0,
+    autoAction: undefined,
+    skills: [],
+    stateChanges: [],
+  },
+];
+
+const getListItem = <
+  Element extends { [key in Key]: string },
+  Key extends string,
+>(
+  list: Element[],
+  key: Key,
+  value: any,
+) => {
+  const element = list.find((e: Element) => e[key] === value);
+  if (element === undefined) {
+    throw new Error(`Not found the ${key}=${value} item`);
+  }
+  return element;
+};
+
+const createFieldObject = (params: {
+  id: string;
+  presetId: FieldObjectPreset["id"];
+}): FieldObject => {
+  const preset = getListItem<FieldObjectPreset, "id">(
+    fieldObjectPresets,
+    "id",
+    params.presetId,
+  );
+  return {
+    ...preset,
+    id: params.id,
+    presetId: params.presetId,
+    elapsedAutoActionWait: 0,
+    // TODO: 回復・損害処理を介するべき
+    lifePoints: preset.maxLifePoints,
+    armorPoints: preset.armorPoints,
+    shieldPoints: preset.shieldPoints,
+  };
+};
+
+const initialize = (): Game => {
+  return {
+    field: createField({ tileGridWidth: 3, tileGridHeight: 2 }),
+  };
+};
+
+console.log(initialize());
