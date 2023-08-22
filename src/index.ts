@@ -1,235 +1,20 @@
 // TODO: オリジナルの動作確認
+// - 封印中はカミツキも無効なんだっけ？
 // - スノッフェルが攻撃力 0 の攻撃を持った条件の調査。オカエシ or ボム1 だった気がする。
+// - アクションの攻撃で敵を倒したときに、アクション中に敵が消えているか。
+//   - アクション中に敵を倒したら後続の内容（本コードだと同一 FieldObjectAutoAction の別 Impact に相当）のターゲットから除外しないといけないと思うんだけど、その辺どうなっているか
 // - シェル・ライフ・ブリンク/50の「追加ダメージ」がログ上別処理になっているのかどうか。
 //   - 別処理なら、lifePointModification として扱った方が良さそう。
 
-type RelativeSide = "ally" | "enemy";
-
-/**
- * 行動者などの始点となるマス目が定まっている前提で、自動的にターゲットを決定するロジックの種類
- *
- * ロジック適用の結果は、1マスのターゲット位置を選択できるかまたは選択できないかである。
- * 効果範囲が複数マスに及ぶ場合は、後述の AreaOfEffect で表現する。
- * 選択できないケースは、オリジナルのモンチの捕食などが該当する。
- */
-type Targetting = Readonly<
-  | {
-      kind: "horizontalDirection";
-      direction: "frontToBack" | "backToFront";
-      /**
-       * 同行にターゲットがいない場合に他行を探すか
-       *
-       * 他行を探す場合は、y+1 -> y-1 -> y+2 -> y-2 ... という順番で探す。
-       * オリジナルは 2 行しかないので、この問題は存在しない。
-       */
-      doesSearchOtherRows: boolean;
-      /**
-       * 始点のマス目をターゲットから除外するか
-       */
-      isExcludingOneself: boolean;
-      side: RelativeSide;
-    }
-  | {
-      kind: "randomInRow";
-      doesSearchOtherRows: boolean;
-      isExcludingOneself: boolean;
-      side: RelativeSide;
-    }
-  | { kind: "selfOnly" }
->;
-
-/**
- * ある一マスのターゲット位置が定まっている前提で、その位置を [0, 0] とした相対位置で表現した効果範囲
- *
- * [[始点x差分, 始点y差分], [終点x差分, 終点y差分]] である。
- * 始点x <= 終点x, 始点y <= 終点y であること。
- *
- * 例:
- * - [[0, 0], [0, 0]] は、ターゲット位置のみ。
- * - [[-2, 0], [2, 0]] は、ターゲット位置の左右 2 マスであり、オリジナルでの「列」に該当する。
- * - [[-2, -1], [2, 1]] は、ターゲット位置の左右 2 マス及び上下 1 行であり、オリジナルでの「全て」に該当する。
- */
-type AreaOfEffect = Readonly<[[number, number], [number, number]]>;
-
-type StateChange = Readonly<
-  { duration: number | undefined } & (
-    | {
-        kind: "autoActionWaitFrozen" | "doubleDamageInflicted" | "sealed";
-      }
-    | {
-        kind:
-          | "attackPointModification"
-          | "actionRepeatModification"
-          | "additionalDamageInflicted"
-          | "gradualWeakeningDot"
-          | "oneTimeAttackPointModification";
-        points: number;
-      }
-    | {
-        /**
-         * オリジナルの混乱はこれで表現する。
-         */
-        kind: "targettingModification";
-        targetting: Targetting;
-      }
-  )
->;
-
-type Effect = Readonly<
-  | { kind: "absorption" }
-  | {
-      kind: "attack";
-      // TODO: もしかすると、攻撃に伴う追加ダメージではなくてこの処理だけ独立なのかもしれない？ログでわかりそう。
-      // TODO: オリジナルだと、ブリンク/50 追加ダメージのオマモリもある。
-      additionalDamageKind: "armor" | "life" | "none";
-      attackPoints: number;
-    }
-  | { kind: "death" }
-  | { kind: "drawCards"; count: number }
-  | { kind: "lifePointModification"; points: number }
-  | { kind: "retreat" }
-  | {
-      /** シールド減少効果、オリジナルのブロックを常に 1 削ることに該当する。 */
-      kind: "shieldScraping";
-      points: number;
-    }
-  | {
-      kind: "stateChange";
-      stateChange: Readonly<StateChange>;
-    }
->;
-
-type Impact = Readonly<{
-  area: AreaOfEffect;
-  effects: Readonly<Array<Effect>>;
-  targetting: Targetting;
-}>;
-
-type FieldObjectSkill = Readonly<
-  | {
-      kind: "autoActionAttackModification";
-      additionalEffect: Effect;
-    }
-  | {
-      kind:
-        | "reactionToAllyAttacks"
-        | "reactionToAttackOnOneself"
-        | "reactionToDotInflictedOnAnyone"
-        | "reactionToEnemyAttacks"
-        | "reactionToEntry"
-        | "reactionToStateChange"
-        | "reactionToStateChangeOnAlly";
-      content:
-        | {
-            kind: "autoActionPerforming";
-            changeTargetting: "toInvoker" | undefined;
-          }
-        | {
-            kind: "impactPerforming";
-            impact: Impact;
-          };
-    }
-  | {
-      /** オリジナルの「場にある間〜」に該当する。 */
-      kind: "stateChange";
-      area: AreaOfEffect;
-      stateChange: StateChange;
-      targetting: Targetting;
-    }
->;
-
-type FieldObjectAutoAction = Readonly<{
-  impacts: Readonly<Array<Impact>>;
-  repeats: number;
-  wait: number;
-}>;
-
-/** オリジナルでは、プレイヤーによるカード使用が該当する。 */
-type InterruptAction = Readonly<{
-  targetSelection: "ally" | "anyone" | "enemy" | "none";
-  targettedImpacts: Array<{
-    area: AreaOfEffect;
-    effect: Effect;
-  }>;
-}>;
-
-/**
- * フィールドのマスを占有するオブジェクト
- *
- * オリジナルだと仲間・エネミー・ボス・ミニボス・クランカーに相当する。
- *
- * TODO: 1 オブジェクトが複数マスを占有することがある。オリジナルだと縦2マスのみ。
- */
-type FieldObject = Readonly<{
-  /** オリジナルのシェルに該当する。 */
-  armorPoints: number;
-  /**
-   * undefined は、行動をしないことを意味する。オリジナルだと、いくつかのクランカーやスパイクなどが該当する。
-   *
-   * 行動に攻撃を伴わないことの表現は、 skills の "autoActionImpact" の effect に "attack" を含まないことで行う。オリジナルだと、タイガ・パイラ・スノッフェルなどが該当する。
-   * なおオリジナルでスノッフェルにオカエシとボム1のオマモリをつけたら、反撃は攻撃力 0 の対象 1 の攻撃を行うようになったが、どちらに起因していたのか不明。
-   */
-  autoAction: FieldObjectAutoAction | undefined;
-  elapsedAutoActionWait: number;
-  /**
-   * ゲーム中に生成されるものは、デバッグのため "{presetId}-{全フィールドオブジェクトで1始まりの連番}" へ統一する。
-   */
-  id: string;
-  lifePoints: number;
-  maxLifePoints: number;
-  /** 必ずプリセットから生成する必要がある。 */
-  presetId: string;
-  /** オリジナルのブロックに該当する。 */
-  shieldPoints: number;
-  skills: Readonly<Array<FieldObjectSkill>>;
-  stateChanges: Readonly<Array<StateChange>>;
-}>;
-
-/**
- * フィールドオブジェクトの雛形
- *
- * 種族のような概念を作って委譲する形式にすると種族変更みたいなことはできてやや面白くはなるけど、パラメータを都度合計しないといけないので開発中の見通しが悪くなる。
- */
-type FieldObjectPreset = Readonly<{
-  armorPoints: FieldObject["armorPoints"];
-  autoAction: FieldObject["autoAction"];
-  id: string;
-  maxLifePoints: FieldObject["maxLifePoints"];
-  shieldPoints: FieldObject["shieldPoints"];
-  skills: FieldObject["skills"];
-  stateChanges: FieldObject["stateChanges"];
-}>;
-
-/**
- * フィールドのマス目に対しての効果
- *
- * 自分が知る限りのオリジナルに存在するものは、複数マス目に対して攻撃してくるボスのマーカーのみ。
- */
-type FieldEffect = Readonly<{}>;
-
-type Tile = Readonly<{}>;
-
-/**
- * 左右それぞれのマス目の二次元配列
- *
- * [0, 0] が最も左上を示す。つまり、CSS 座標空間と似ている。
- *
- * 左右問わずに、右側に配置した時の座標で表現する。左側は処理内で左右反転して扱う。
- * つまり、オリジナルでは敵側が見た目通りの座標計算となる。
- */
-type TileGrid = Readonly<Array<Array<Tile>>>;
-
-type Field = Readonly<{
-  fieldEffects: Array<FieldEffect>;
-  fieldObjects: Array<FieldObject>;
-  leftSideTileGrid: TileGrid;
-  rightSideTileGrid: TileGrid;
-}>;
-
-// TODO: プレイヤーと手札・山札・捨札・いわゆる行動点管理。0-2 人対応にできると良さそう。
-type Game = Readonly<{
-  field: Field;
-}>;
+import { fieldObjectPresets } from "./field-object-presets";
+import type {
+  FieldObjectPreset,
+  Field,
+  FieldObject,
+  Game,
+  Tile,
+  TileGrid,
+} from "./types";
 
 const createTileGrid = (params: {
   width: number;
@@ -264,60 +49,6 @@ const createField = (params: {
   };
 };
 
-const defaultFieldObjectPreset = {
-  maxLifePoints: 1,
-  armorPoints: 0,
-  shieldPoints: 0,
-  autoAction: undefined,
-  skills: [],
-  stateChanges: [],
-} as const satisfies Partial<FieldObjectPreset>;
-
-const fieldObjectPresets: FieldObjectPreset[] = [
-  {
-    ...defaultFieldObjectPreset,
-    id: "snoof",
-    maxLifePoints: 3,
-    autoAction: {
-      wait: 3,
-      repeats: 1,
-      impacts: [
-        {
-          targetting: {
-            kind: "horizontalDirection",
-            side: "enemy",
-            direction: "frontToBack",
-            doesSearchOtherRows: false,
-            isExcludingOneself: true,
-          },
-          area: [
-            [0, 0],
-            [0, 0],
-          ],
-          effects: [
-            {
-              kind: "attack",
-              attackPoints: 3,
-              additionalDamageKind: "none",
-            },
-            {
-              kind: "stateChange",
-              stateChange: {
-                kind: "autoActionWaitFrozen",
-                duration: 1,
-              },
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
-    ...defaultFieldObjectPreset,
-    id: "tester",
-  },
-];
-
 const getListItem = <
   ListItem extends { [key in Key]: string },
   Key extends string,
@@ -334,10 +65,12 @@ const getListItem = <
 };
 
 const createFieldObject = (params: {
+  fieldObjectPresets?: FieldObjectPreset[];
   id: string;
   presetId: FieldObjectPreset["id"];
 }): FieldObject => {
-  const preset = getListItem(fieldObjectPresets, "id", params.presetId);
+  const fieldObjectPresets_ = params.fieldObjectPresets ?? fieldObjectPresets;
+  const preset = getListItem(fieldObjectPresets_, "id", params.presetId);
   return {
     id: params.id,
     presetId: params.presetId,
@@ -345,18 +78,25 @@ const createFieldObject = (params: {
     // TODO: 回復・損害処理を介するべき
     lifePoints: preset.maxLifePoints,
     maxLifePoints: preset.maxLifePoints,
+    counterattackPoints: preset.counterattackPoints,
     armorPoints: preset.armorPoints,
     shieldPoints: preset.shieldPoints,
+    canRetreat: true,
     autoAction: preset.autoAction,
     skills: preset.skills,
     stateChanges: preset.stateChanges,
   };
 };
 
-const initialize = (): Game => {
+export const initialize = (): Game => {
+  let field = createField({ tileGridWidth: 3, tileGridHeight: 2 });
+  field = {
+    ...field,
+    fieldObjects: [createFieldObject({ presetId: "snoof", id: "snoof-1" })],
+  };
   return {
-    field: createField({ tileGridWidth: 3, tileGridHeight: 2 }),
+    field,
   };
 };
 
-console.log(initialize());
+console.log(require("util").inspect(initialize(), false, null, true));

@@ -1,7 +1,7 @@
-import { add } from "./index";
+import { initialize } from "./index";
 
-describe("add", () => {
-  test("adds two numbers", () => {
-    expect(add(1, 2)).toStrictEqual(3);
+describe("initialize", () => {
+  test("it can run", () => {
+    expect(initialize()).not.toBeUndefined();
   });
 });
