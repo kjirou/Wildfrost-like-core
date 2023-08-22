@@ -212,7 +212,7 @@ type Field = {
   rightSideTileGrid: TileGrid;
 };
 
-// TODO: プレイヤーと手札・山札・捨札。0-2 人対応にできると良さそう。
+// TODO: プレイヤーと手札・山札・捨札・いわゆる行動点管理。0-2 人対応にできると良さそう。
 type Game = {
   field: Field;
 };
@@ -263,38 +263,37 @@ const fieldObjectPresets: FieldObjectPreset[] = [
 ];
 
 const getListItem = <
-  Element extends { [key in Key]: string },
+  ListItem extends { [key in Key]: string },
   Key extends string,
 >(
-  list: Element[],
+  list: ListItem[],
   key: Key,
   value: any,
-) => {
-  const element = list.find((e: Element) => e[key] === value);
-  if (element === undefined) {
+): ListItem => {
+  const item = list.find((e: ListItem) => e[key] === value);
+  if (item === undefined) {
     throw new Error(`Not found the ${key}=${value} item`);
   }
-  return element;
+  return item;
 };
 
 const createFieldObject = (params: {
   id: string;
   presetId: FieldObjectPreset["id"];
 }): FieldObject => {
-  const preset = getListItem<FieldObjectPreset, "id">(
-    fieldObjectPresets,
-    "id",
-    params.presetId,
-  );
+  const preset = getListItem(fieldObjectPresets, "id", params.presetId);
   return {
-    ...preset,
     id: params.id,
     presetId: params.presetId,
     elapsedAutoActionWait: 0,
     // TODO: 回復・損害処理を介するべき
     lifePoints: preset.maxLifePoints,
+    maxLifePoints: preset.maxLifePoints,
     armorPoints: preset.armorPoints,
     shieldPoints: preset.shieldPoints,
+    autoAction: preset.autoAction,
+    skills: preset.skills,
+    stateChanges: preset.stateChanges,
   };
 };
 
