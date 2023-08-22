@@ -12,7 +12,7 @@ type RelativeSide = "ally" | "enemy";
  * 効果範囲が複数マスに及ぶ場合は、後述の AreaOfEffect で表現する。
  * 選択できないケースは、オリジナルのモンチの捕食などが該当する。
  */
-type Targetting =
+type Targetting = Readonly<
   | {
       kind: "horizontalDirection";
       direction: "frontToBack" | "backToFront";
@@ -35,7 +35,8 @@ type Targetting =
       isExcludingOneself: boolean;
       side: RelativeSide;
     }
-  | { kind: "selfOnly" };
+  | { kind: "selfOnly" }
+>;
 
 /**
  * ある一マスのターゲット位置が定まっている前提で、その位置を [0, 0] とした相対位置で表現した効果範囲
@@ -48,31 +49,33 @@ type Targetting =
  * - [[-2, 0], [2, 0]] は、ターゲット位置の左右 2 マスであり、オリジナルでの「列」に該当する。
  * - [[-2, -1], [2, 1]] は、ターゲット位置の左右 2 マス及び上下 1 行であり、オリジナルでの「全て」に該当する。
  */
-type AreaOfEffect = [[number, number], [number, number]];
+type AreaOfEffect = Readonly<[[number, number], [number, number]]>;
 
-type StateChange = { duration: number | undefined } & (
-  | {
-      kind: "actionWaitFrozen" | "doubleDamageInflicted" | "sealed";
-    }
-  | {
-      kind:
-        | "attackPointModification"
-        | "actionRepeatModification"
-        | "additionalDamageInflicted"
-        | "gradualWeakeningDot"
-        | "oneTimeAttackPointModification";
-      points: number;
-    }
-  | {
-      /**
-       * オリジナルの混乱はこれで表現する。
-       */
-      kind: "targettingModification";
-      targetting: Targetting;
-    }
-);
+type StateChange = Readonly<
+  { duration: number | undefined } & (
+    | {
+        kind: "autoActionWaitFrozen" | "doubleDamageInflicted" | "sealed";
+      }
+    | {
+        kind:
+          | "attackPointModification"
+          | "actionRepeatModification"
+          | "additionalDamageInflicted"
+          | "gradualWeakeningDot"
+          | "oneTimeAttackPointModification";
+        points: number;
+      }
+    | {
+        /**
+         * オリジナルの混乱はこれで表現する。
+         */
+        kind: "targettingModification";
+        targetting: Targetting;
+      }
+  )
+>;
 
-type Effect =
+type Effect = Readonly<
   | { kind: "absorption" }
   | {
       kind: "attack";
@@ -80,21 +83,32 @@ type Effect =
       // TODO: オリジナルだと、ブリンク/50 追加ダメージのオマモリもある。
       additionalDamageKind: "armor" | "life" | "none";
       attackPoints: number;
-      /** シールド減少する点数。オリジナルにはなさそうな概念で、オリジナル相当だと常に1。 */
-      shieldScrapingPoints: number;
     }
   | { kind: "death" }
   | { kind: "drawCards"; count: number }
   | { kind: "lifePointModification"; points: number }
   | { kind: "retreat" }
-  | { kind: "stateChangeAddition"; points: number };
-
-type FieldObjectSkill =
   | {
-      kind: "autoActionImpact";
-      area: AreaOfEffect;
-      effect: Effect;
-      targetting: Targetting;
+      /** シールド減少効果、オリジナルのブロックを常に 1 削ることに該当する。 */
+      kind: "shieldScraping";
+      points: number;
+    }
+  | {
+      kind: "stateChange";
+      stateChange: Readonly<StateChange>;
+    }
+>;
+
+type Impact = Readonly<{
+  area: AreaOfEffect;
+  effects: Readonly<Array<Effect>>;
+  targetting: Targetting;
+}>;
+
+type FieldObjectSkill = Readonly<
+  | {
+      kind: "autoActionAttackModification";
+      additionalEffect: Effect;
     }
   | {
       kind:
@@ -111,10 +125,8 @@ type FieldObjectSkill =
             changeTargetting: "toInvoker" | undefined;
           }
         | {
-            kind: "impact";
-            area: AreaOfEffect;
-            effect: Effect;
-            targetting: Targetting;
+            kind: "impactPerforming";
+            impact: Impact;
           };
     }
   | {
@@ -123,21 +135,23 @@ type FieldObjectSkill =
       area: AreaOfEffect;
       stateChange: StateChange;
       targetting: Targetting;
-    };
+    }
+>;
 
-type FieldObjectAutoAction = {
+type FieldObjectAutoAction = Readonly<{
+  impacts: Readonly<Array<Impact>>;
   repeats: number;
   wait: number;
-};
+}>;
 
 /** オリジナルでは、プレイヤーによるカード使用が該当する。 */
-type InterruptAction = {
-  impacts: Array<{
+type InterruptAction = Readonly<{
+  targetSelection: "ally" | "anyone" | "enemy" | "none";
+  targettedImpacts: Array<{
     area: AreaOfEffect;
     effect: Effect;
   }>;
-  targetSelection: "ally" | "anyone" | "enemy" | "none";
-};
+}>;
 
 /**
  * フィールドのマスを占有するオブジェクト
@@ -146,7 +160,7 @@ type InterruptAction = {
  *
  * TODO: 1 オブジェクトが複数マスを占有することがある。オリジナルだと縦2マスのみ。
  */
-type FieldObject = {
+type FieldObject = Readonly<{
   /** オリジナルのシェルに該当する。 */
   armorPoints: number;
   /**
@@ -167,16 +181,16 @@ type FieldObject = {
   presetId: string;
   /** オリジナルのブロックに該当する。 */
   shieldPoints: number;
-  skills: Array<FieldObjectSkill>;
-  stateChanges: Array<StateChange>;
-};
+  skills: Readonly<Array<FieldObjectSkill>>;
+  stateChanges: Readonly<Array<StateChange>>;
+}>;
 
 /**
  * フィールドオブジェクトの雛形
  *
  * 種族のような概念を作って委譲する形式にすると種族変更みたいなことはできてやや面白くはなるけど、パラメータを都度合計しないといけないので開発中の見通しが悪くなる。
  */
-type FieldObjectPreset = {
+type FieldObjectPreset = Readonly<{
   armorPoints: FieldObject["armorPoints"];
   autoAction: FieldObject["autoAction"];
   id: string;
@@ -184,16 +198,16 @@ type FieldObjectPreset = {
   shieldPoints: FieldObject["shieldPoints"];
   skills: FieldObject["skills"];
   stateChanges: FieldObject["stateChanges"];
-};
+}>;
 
 /**
  * フィールドのマス目に対しての効果
  *
  * 自分が知る限りのオリジナルに存在するものは、複数マス目に対して攻撃してくるボスのマーカーのみ。
  */
-type FieldEffect = {};
+type FieldEffect = Readonly<{}>;
 
-type Tile = {};
+type Tile = Readonly<{}>;
 
 /**
  * 左右それぞれのマス目の二次元配列
@@ -203,31 +217,31 @@ type Tile = {};
  * 左右問わずに、右側に配置した時の座標で表現する。左側は処理内で左右反転して扱う。
  * つまり、オリジナルでは敵側が見た目通りの座標計算となる。
  */
-type TileGrid = Array<Array<Tile>>;
+type TileGrid = Readonly<Array<Array<Tile>>>;
 
-type Field = {
+type Field = Readonly<{
   fieldEffects: Array<FieldEffect>;
   fieldObjects: Array<FieldObject>;
   leftSideTileGrid: TileGrid;
   rightSideTileGrid: TileGrid;
-};
+}>;
 
 // TODO: プレイヤーと手札・山札・捨札・いわゆる行動点管理。0-2 人対応にできると良さそう。
-type Game = {
+type Game = Readonly<{
   field: Field;
-};
+}>;
 
 const createTileGrid = (params: {
   width: number;
   height: number;
 }): TileGrid => {
-  const tileGrid: TileGrid = [];
+  let tileGrid: TileGrid = [];
   for (let i = 0; i < params.height; i++) {
     const row: Tile[] = [];
     for (let j = 0; j < params.width; j++) {
       row.push({ occupation: undefined });
     }
-    tileGrid.push(row);
+    tileGrid = [...tileGrid, row];
   }
   return tileGrid;
 };
@@ -250,15 +264,57 @@ const createField = (params: {
   };
 };
 
+const defaultFieldObjectPreset = {
+  maxLifePoints: 1,
+  armorPoints: 0,
+  shieldPoints: 0,
+  autoAction: undefined,
+  skills: [],
+  stateChanges: [],
+} as const satisfies Partial<FieldObjectPreset>;
+
 const fieldObjectPresets: FieldObjectPreset[] = [
   {
-    id: "none",
-    maxLifePoints: 1,
-    armorPoints: 0,
-    shieldPoints: 0,
-    autoAction: undefined,
-    skills: [],
-    stateChanges: [],
+    ...defaultFieldObjectPreset,
+    id: "snoof",
+    maxLifePoints: 3,
+    autoAction: {
+      wait: 3,
+      repeats: 1,
+      impacts: [
+        {
+          targetting: {
+            kind: "horizontalDirection",
+            side: "enemy",
+            direction: "frontToBack",
+            doesSearchOtherRows: false,
+            isExcludingOneself: true,
+          },
+          area: [
+            [0, 0],
+            [0, 0],
+          ],
+          effects: [
+            {
+              kind: "attack",
+              attackPoints: 3,
+              additionalDamageKind: "none",
+            },
+            {
+              kind: "stateChange",
+              stateChange: {
+                kind: "autoActionWaitFrozen",
+                duration: 1,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    ...defaultFieldObjectPreset,
+    id: "tester",
   },
 ];
 
