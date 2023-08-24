@@ -1,5 +1,6 @@
 // TODO: オリジナルの動作確認
 // - 封印中はカミツキも無効なんだっけ？
+// - リルガジの攻撃力+1は本人にも有効？
 // - スノッフェルが攻撃力 0 の攻撃を持った条件の調査。オカエシ or ボム1 だった気がする。
 // - アクションの攻撃で敵を倒したときに、アクション中に敵が消えているか。
 //   - アクション中に敵を倒したら後続の内容（本コードだと同一 FieldObjectAutoAction の別 Impact に相当）のターゲットから除外しないといけないと思うんだけど、その辺どうなっているか
@@ -99,4 +100,5 @@ export const initialize = (): Game => {
   };
 };
 
-console.log(require("util").inspect(initialize(), false, null, true));
+//console.log(require("util").inspect(initialize(), false, null, true));
+console.log(require("util").inspect(fieldObjectPresets, false, null, true));

@@ -6,6 +6,8 @@ export type RelativeSide = "ally" | "enemy";
  * ロジック適用の結果は、1マスのターゲット位置を選択できるかまたは選択できないかである。
  * 効果範囲が複数マスに及ぶ場合は、後述の AreaOfEffect で表現する。
  * 選択できないケースは、オリジナルのモンチの捕食などが該当する。
+ *
+ * カードドローなどのターゲットを要さない効果に対しては "self" を設定する。
  */
 export type Targetting = Readonly<
   | {
@@ -24,15 +26,23 @@ export type Targetting = Readonly<
       priority: "backToFront" | "frontToBack" | "random";
       side: RelativeSide;
     }
-  | { kind: "selfOnly" }
+  | { kind: "self" }
 >;
 
 /**
  * ある一マスのターゲット位置が定まっている前提で、そのマス目を起点とした効果範囲
  *
  * 相対座標の羅列にするなど動的なパラメータとして表現することはできるが、ユーザーへの表示の時に難しくなるので種別としての表現が良さそう。
+ *
+ * フィールド内に効果を及ぼさない場合は "none" を設定する。
  */
-export type EffectArea = "all" | "allOfSide" | "row" | "single";
+export type EffectArea =
+  | "all"
+  | "row"
+  | "none"
+  | "side"
+  | "sideExcludingOneself"
+  | "single";
 
 export type StateChange = Readonly<
   { duration: number | undefined } & (
@@ -72,7 +82,7 @@ export type Effect = Readonly<
     }
   | { kind: "death" }
   | { kind: "drawCards"; count: number }
-  | { kind: "lifePointsModification"; points: number }
+  | { kind: "healing"; points: number }
   | {
       kind: "maxLifePointsModification";
       isWithHealing: boolean;
@@ -121,11 +131,15 @@ export type FieldObjectSkill = Readonly<
           };
     }
   | {
-      /** オリジナルの「場にある間〜」に該当する。 */
-      kind: "stateChange";
+      /**
+       * オリジナルの「場にある間〜」に該当する。
+       * 全てのフィールドオブジェクトが参入または隊列変更時に永続の状態変化を発動する。
+       * TODO: 永続だけど複数回トリガーされて結果として重複させられないので、StateChange の duration の流用だとダメそう。
+       */
+      kind: "stateChangeOnFormationChange";
       area: EffectArea;
-      stateChange: StateChange;
-      targetting: Targetting;
+      stateChanges: Readonly<Array<StateChange>>;
+      targetting: Readonly<Targetting>;
     }
 >;
 
